@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriveRight Schedular</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the document structure */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+
+        /* Styling for inputs to look better inside tables */
+        .table-input {
+            appearance: none;
+            border: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+            padding: 2px 4px; 
+            text-align: center;
+            font-size: 0.875rem; /* text-sm */
+        }
+
+        /* Hide the elements that shouldn't appear in the print/PDF output */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .page-container {
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                min-height: initial !important;
+            }
+            /* Ensure the table cell borders are black for printing */
+            table, th, td {
+                border-color: #000 !important;
+            }
+            /* Ensure the font is black for printing */
+            * {
+                color: #000 !important;
+            }
+            /* Ensure the schedule groups maintain their block structure for clean page breaks */
+            .schedule-group {
+                /* Perubahan ini penting untuk cetakan: kurangkan margin bawah antara kumpulan jadual */
+                margin-bottom: 10px; /* Diubah dari 20px */
+                width: 100%; /* Ensure full width when printed */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="p-4 md:p-8 flex justify-center">
+    <div id="app-container" class="page-container w-full max-w-4xl bg-white shadow-xl rounded-lg p-6 md:p-10 min-h-screen">
+        
+        <!-- Header and Global Controls -->
+        <div class="no-print mb-6 border-b pb-4">
+            <h1 class="text-3xl font-bold text-gray-800">DriveRight Schedular</h1>
+            <p class="text-gray-500">Add entries, calculate total time, and print your custom schedule.</p>
+        </div>
+
+        <div class="no-print mb-8 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
+            <label class="block">
+                <span class="text-xs font-semibold text-gray-600">Student IC</span>
+                <input type="text" id="student-ic" oninput="updateGlobalData('studentIC', this.value)"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="e.g., 000000000000">
+            </label>
+            <label class="block">
+                <span class="text-xs font-semibold text-gray-600">Student Name</span>
+                <input type="text" id="student-name" oninput="updateGlobalData('studentName', this.value)"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="e.g., NAME">
+            </label>
+            <label class="block">
+                <span class="text-xs font-semibold text-gray-600">Agent</span>
+                <input type="text" id="agent" oninput="updateGlobalData('agent', this.value)"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="e.g., DR001">
+            </label>
+        </div>
+
+        <!-- Print Area Start -->
+        <header class="text-center mb-4">
+            <h2 class="text-xl font-bold uppercase tracking-wider">AKADEMI MEMANDU GABUNGAN DUNIA SDN BHD</h2>
+            <p class="text-sm">LOT 3204, JALAN SUNGAI YU 45000 KUALA SELANGOR MALAYSIA</p>
+        </header>
+
+        <!-- Dynamic Student/Agent Details - SIDE-BY-SIDE (grid-cols-3) with flexible name column -->
+        <div class="student-details-grid mb-4 text-sm grid grid-cols-1 md:grid-cols-3 gap-y-1 md:gap-x-4">
+            
+            <!-- Student IC -->
+            <p class="flex items-center">
+                <span class="font-bold inline-block w-20 text-left">Student IC</span>
+                <span class="font-bold mr-1">:</span>
+                <span id="display-ic" class="font-medium flex-1"></span>
+            </p>
+            
+            <!-- Student Name -->
+            <p class="flex items-center">
+                <span class="font-bold inline-block text-left whitespace-nowrap">Student Name</span>
+                <span class="font-bold mr-1">:</span>
+                <span id="display-name" class="font-medium flex-1"></span>
+            </p>
+            
+            <!-- Agent -->
+            <p class="flex items-center">
+                <span class="font-bold inline-block w-20 text-left">Agent</span>
+                <span class="font-bold mr-1">:</span>
+                <span id="display-agent" class="font-medium flex-1"></span>
+            </p>
+        </div>
+        
+        <!-- Schedule Container -->
+        <div id="schedule-container">
+            <!-- Dynamic schedule content will be inserted here -->
+        </div>
+
+        <!-- Print/PDF Button and Add Date Button -->
+        <div class="no-print mt-10 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <button onclick="addDateGroup()"
+                    class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 transform hover:scale-105">
+                + Add New Date Group
+            </button>
+            <button onclick="window.print()"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 transform hover:scale-105">
+                &#91; &#x2399; &#93; Print / Save as PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- FIREBASE/APP INITIALIZATION PLACEHOLDERS (Not used for this local app) ---
+    // The user's request is for a website that runs on GitHub, which implies a simple static site.
+    // Therefore, data is stored in memory (`appState`) and not in Firestore.
+    // If you needed persistent storage for multiple users, you would use Firestore here.
+    // const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    // const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    // const initialAuthtoken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    // --- END PLACEHOLDERS ---
+
+    const scheduleContainer = document.getElementById('schedule-container');
+    
+    // Initial State Structure
+    let appState = {
+        studentIC: '000000000000',
+        studentName: 'NAME', // Nama panjang untuk ujian
+        agent: 'DR001',
+        schedules: []
+    };
+
+    /**
+     * Converts a string of minutes into HH:MM:SS format.
+     * @param {number} totalMinutes
+     * @returns {string} HH:MM:00
+     */
+    function formatDuration(totalMinutes) {
+        if (totalMinutes < 0) return '00:00:00';
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = Math.round(totalMinutes % 60);
+        
+        const pad = (num) => String(num).padStart(2, '0');
+        return `${pad(hours)}:${pad(minutes)}:00`;
+    }
+
+    /**
+     * Calculates the time difference between two HH:MM time strings in minutes.
+     * @param {string} startTime - e.g., "08:00"
+     * @param {string} endTime - e.g., "11:30"
+     * @returns {number} Duration in minutes
+     */
+    function calculateDurationInMinutes(startTime, endTime) {
+        if (!startTime || !endTime) return 0;
+
+        const [startH, startM] = startTime.split(':').map(Number);
+        const [endH, endM] = endTime.split(':').map(Number);
+
+        const startDate = new Date(0, 0, 0, startH, startM);
+        const endDate = new Date(0, 0, 0, endH, endM);
+        
+        // Handle time wrap-around (e.g., 23:00 to 02:00 next day)
+        if (endDate < startDate) {
+            endDate.setDate(endDate.getDate() + 1); // Treat it as the next day
+        }
+
+        const diffMs = endDate - startDate;
+        return Math.floor(diffMs / (1000 * 60));
+    }
+
+    /**
+     * Renders the entire schedule to the DOM.
+     */
+    function renderSchedule() {
+        // 1. Update Global Display Details (for input fields)
+        document.getElementById('student-ic').value = appState.studentIC;
+        document.getElementById('student-name').value = appState.studentName;
+        document.getElementById('agent').value = appState.agent;
+        
+        // 2. Update Display Details (for print/view)
+        document.getElementById('display-ic').textContent = appState.studentIC || 'N/A';
+        document.getElementById('display-name').textContent = appState.studentName || 'N/A';
+        document.getElementById('display-agent').textContent = appState.agent || 'N/A';
+        
+        // Define the explicit order of input fields for rendering
+        const orderedInputKeys = ['jenis', 'pengajar', 'mula', 'tamat'];
+        const postJumInputKeys = ['kelas', 'noPlat'];
+
+        // 3. Render Schedule Tables
+        scheduleContainer.innerHTML = appState.schedules.map((schedule, dateIndex) => {
+            
+            // Calculate Total Duration for this group
+            let totalMinutes = 0;
+            schedule.entries.forEach(entry => {
+                const durationMinutes = calculateDurationInMinutes(entry.mula, entry.tamat);
+                totalMinutes += durationMinutes;
+            });
+            const totalDurationString = formatDuration(totalMinutes);
+            
+            // Format date for display
+            const displayDate = schedule.date ? new Date(schedule.date).toLocaleDateString('en-GB') : 'N/A';
+            
+            return `
+                <!--
+                *** PERUBAHAN PENTING DI SINI ***
+                Mengurangkan jurang di antara kumpulan tarikh:
+                mb-10 telah diubah kepada mb-4.
+                mb-10 was changed to mb-4 (Margin Bottom).
+                -->
+                <div class="schedule-group mb-4 border border-gray-200 rounded-lg overflow-hidden bg-white shadow-md">
+                    <!-- Date Header (Non-Printable) -->
+                    <div class="p-3 bg-gray-100 flex justify-between items-center no-print">
+                        <label class="text-sm font-bold text-gray-700">
+                            Tarikh Penjadualan:
+                            <input type="date" value="${schedule.date}" onchange="updateDateGroup(${dateIndex}, this.value)"
+                                   class="ml-2 px-2 py-1 border border-gray-300 rounded-md">
+                        </label>
+                        <button onclick="removeDateGroup(${dateIndex})"
+                                class="bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-1 px-3 rounded-full transition duration-300">
+                            Remove Date
+                        </button>
+                    </div>
+
+                    <!-- Print Date Header -->
+                    <div class="p-2 border-b border-gray-300 print-only">
+                        <p class="text-sm font-bold">Tarikh Penjadualan: ${displayDate}</p>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-300 border-collapse">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">Bil</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">Jenis</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">Pengajar</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">Mula (HH:MM)</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">Tamat (HH:MM)</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">Jum.</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">Kelas</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600">No Plat</th>
+                                    <th class="border border-gray-300 p-1 text-center text-xs font-semibold text-gray-600 no-print">Act.</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${schedule.entries.map((entry, rowIndex) => `
+                                    <tr class="hover:bg-gray-50">
+                                        <!-- Bil -->
+                                        <td class="border border-gray-300 p-0 text-center text-xs font-medium">${rowIndex + 1}</td>
+                                        
+                                        <!-- Inputs up to Tamat (Jenis, Pengajar, Mula, Tamat) -->
+                                        ${orderedInputKeys.map(key => `
+                                            <td class="border border-gray-300 p-0">
+                                                <input type="${key === 'mula' || key === 'tamat' ? 'time' : 'text'}" 
+                                                       value="${entry[key] || ''}" 
+                                                       onchange="updateEntry(${dateIndex}, ${rowIndex}, '${key}', this.value)"
+                                                       class="table-input ${key === 'mula' || key === 'tamat' ? 'font-mono' : ''}">
+                                            </td>
+                                        `).join('')}
+
+                                        <!-- Jum. (Calculated Duration) -->
+                                        <td class="border border-gray-300 p-1 text-center text-xs font-bold bg-gray-50" data-jum-row="${entry.id}">
+                                            ${formatDuration(calculateDurationInMinutes(entry.mula, entry.tamat))}
+                                        </td>
+
+                                        <!-- Inputs after Jum. (Kelas, No Plat) -->
+                                        ${postJumInputKeys.map(key => `
+                                            <td class="border border-gray-300 p-0">
+                                                <input type="text" 
+                                                       value="${entry[key] || ''}" 
+                                                       onchange="updateEntry(${dateIndex}, ${rowIndex}, '${key}', this.value)"
+                                                       class="table-input">
+                                            </td>
+                                        `).join('')}
+
+                                        <!-- Action -->
+                                        <td class="border border-gray-300 p-2 no-print text-center">
+                                            <button onclick="removeRow(${dateIndex}, ${rowIndex})"
+                                                    class="text-red-500 hover:text-red-700 text-sm font-bold">
+                                                &times;
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                                <tr>
+                                    <!-- Total: label (spans 5 columns) -->
+                                    <td colspan="5" class="border border-gray-300 p-1 text-right text-xs font-semibold bg-gray-50">Total:</td>
+                                    
+                                    <!-- Total Duration for the date group (1 column) -->
+                                    <td class="border border-gray-300 p-1 text-center text-xs font-bold bg-yellow-100" id="total-duration-${dateIndex}">
+                                        ${totalDurationString}
+                                    </td>
+                                    
+                                    <!-- Span Kelas and No Plat columns (2 columns) -->
+                                    <td colspan="2" class="border border-gray-300"></td>
+                                    <td colspan="1" class="border border-gray-300 no-print"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Add Row Button -->
+                    <div class="p-3 bg-gray-50 no-print flex justify-center">
+                        <button onclick="addRow(${dateIndex})"
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold py-1 px-4 rounded-lg transition duration-300">
+                            + Add Entry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Updates the global student/agent data.
+     */
+    function updateGlobalData(field, value) {
+        appState[field] = value;
+        renderSchedule(); // Re-render to update the display details
+    }
+
+    /**
+     * Updates the date of a schedule group.
+     */
+    function updateDateGroup(dateIndex, newDate) {
+        appState.schedules[dateIndex].date = newDate;
+        renderSchedule();
+    }
+
+    /**
+     * Updates an entry field (e.g., 'pengajar', 'mula', 'tamat') and recalculates totals.
+     */
+    function updateEntry(dateIndex, rowIndex, field, value) {
+        appState.schedules[dateIndex].entries[rowIndex][field] = value;
+        renderSchedule(); // Re-render everything to update calculated fields
+    }
+
+    /**
+     * Adds a new date group to the schedule.
+     */
+    function addDateGroup() {
+        const today = new Date().toISOString().split('T')[0];
+        const newSchedule = {
+            date: today,
+            entries: [{
+                id: crypto.randomUUID(),
+                // Initial data keys must be consistent with the rendering logic
+                jenis: 'KPP0', pengajar: 'ZAHIN', mula: '08:00', tamat: '11:00', 
+                kelas: 'DA', noPlat: 'VJG303'
+            }]
+        };
+        appState.schedules.push(newSchedule);
+        renderSchedule();
+    }
+
+    /**
+     * Removes a date group.
+     */
+    function removeDateGroup(dateIndex) {
+        if (confirm('Are you sure you want to remove this entire date schedule?')) {
+            appState.schedules.splice(dateIndex, 1);
+            renderSchedule();
+        }
+    }
+
+    /**
+     * Adds a new empty row entry to a specific date group.
+     */
+    function addRow(dateIndex) {
+        const newEntry = {
+            id: crypto.randomUUID(),
+            // Initial data keys
+            jenis: '', pengajar: '', mula: '', tamat: '', 
+            kelas: '', noPlat: ''
+        };
+        appState.schedules[dateIndex].entries.push(newEntry);
+        renderSchedule();
+    }
+
+    /**
+     * Removes a row entry from a specific date group.
+     */
+    function removeRow(dateIndex, rowIndex) {
+        if (confirm('Are you sure you want to remove this schedule entry?')) {
+            appState.schedules[dateIndex].entries.splice(rowIndex, 1);
+            renderSchedule();
+        }
+    }
+
+    /**
+     * Initialize the application by adding a default schedule group and rendering.
+     */
+    function initializeApp() {
+        // Load initial data (or load from localStorage/Firestore if implemented)
+        if (appState.schedules.length === 0) {
+            addDateGroup();
+        }
+        renderSchedule();
+    }
+
+    window.onload = initializeApp;
+
+</script>
+
+</body>
+</html>
